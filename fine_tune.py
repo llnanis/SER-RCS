@@ -133,7 +133,8 @@ def generate_single_input(image,mode) :
             #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
         tens = transform(image)
-    
+        
+        
     if (len(tens.size())<4) :
         tens = torch.unsqueeze(tens, 0) #for the batch_size dimension [1,3,227,227]
     
@@ -165,8 +166,7 @@ def generate_dcnn_input(images,mode):
     for i, image in enumerate(images) :
         temp = generate_single_input(image,mode)
         input_tensor[i,:,:,:] = temp
-        
-        #test[i*5:(i+1)*5,:,:,:] = temp
+
         
     return input_tensor
 
@@ -203,7 +203,7 @@ def is_frozen(model,show_param = True):
             print(p.shape)
 
 
-def create_alexnet(n_classes=1000,pretrained = True):
+def create_alexnet(n_classes,pretrained):
     """
     create alexnet network
     Parameters
@@ -229,6 +229,50 @@ def create_alexnet(n_classes=1000,pretrained = True):
     return alexnet
 
 
+def create_resnet(resnet_name, n_classes ,pretrained ):
+    
+    if resnet_name == "resnet18":
+        resnet = models.resnet18(pretrained= pretrained)
+        resnet.fc = nn.Linear(512, n_classes)
+    if resnet_name == "resnet34":
+        resnet = models.resnet34(pretrained= pretrained)
+        resnet.fc = nn.Linear(512, n_classes)
+    if resnet_name == "resnet50":
+        resnet = models.resnet50(pretrained= pretrained)
+        resnet.fc = nn.Linear(2048, n_classes)
+    if resnet_name == "resnet101":
+        resnet = models.resnet101(pretrained= pretrained)
+        resnet.fc = nn.Linear(2048, n_classes)
+    if resnet_name == "resnet152":
+        resnet = models.resnet152(pretrained= pretrained)
+        resnet.fc = nn.Linear(2048, n_classes)
+
+    
+
+    return resnet
+
+def create_inception(n_classes,pretrained) :
+    incep = models.inception_v3(pretrained = pretrained)
+    incep.AuxLogits.fc = nn.Linear(768, n_classes)
+    incep.fc = nn.Linear(2048, n_classes)
+    
+    return incep
+
+def create_model(model_name,n_classes,pretrained= True) :
+        
+    if model_name.find("alexnet") != -1 :
+        model = create_alexnet(n_classes,pretrained)
+    elif model_name.find("resnet") != -1 :
+        model = create_resnet(model_name,n_classes,pretrained)
+    elif model_name.find("inception") != -1 :
+        model = create_inception(n_classes,pretrained)
+    else :
+        print("INVALID MODEL NAME")
+        exit()
+        
+    return model
+    
+        
 def emotions_to_label(dic,emotions_array) : 
     """
     Converts array of emotions into array of label
@@ -251,13 +295,13 @@ def emotions_to_label(dic,emotions_array) :
     return label
 
 
-def train_model(model,dataloaders,criterion,optimizer,num_epochs=25):
+def train_model(model,dataloaders,criterion,optimizer,num_epochs=25,inception = False):
     """
     Start training the model
 
     Parameters
     ----------
-    model : alexnet model used
+    model : dcnn model used
     dataloaders : DataLoaders
         dictionnary of dataloaders : dataloaders = {"train" : dataloader_train, "val" : dataloader_val}
     criterion : criterion used (loss function)
@@ -321,10 +365,22 @@ def train_model(model,dataloaders,criterion,optimizer,num_epochs=25):
                 with torch.set_grad_enabled(phase == 'train'):
                 # Get model outputs and calculate loss
                     #outputs = model(inputs.double()) #########################
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-                    _, preds = torch.max(outputs, 1)
                     
+                    
+                    if inception and phase == "train" :
+                        outputs, aux_outputs = model(inputs)
+                        loss1 = criterion(outputs, labels)
+                        loss2 = criterion(aux_outputs, labels)
+                        loss = loss1 + 0.4*loss2
+                        
+                        
+                    else :
+                        outputs = model(inputs)
+                        loss = criterion(outputs, labels)
+                        
+                        
+                    _, preds = torch.max(outputs, 1)
+        
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
@@ -341,10 +397,12 @@ def train_model(model,dataloaders,criterion,optimizer,num_epochs=25):
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
                 val_loss_history.append(epoch_loss)
+                    
             if phase == 'train':
                 train_acc_history.append(epoch_acc)
                 train_loss_history.append(epoch_loss)
-
+                
+    
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
@@ -359,7 +417,7 @@ def train_model(model,dataloaders,criterion,optimizer,num_epochs=25):
     # load best model weights
     model.load_state_dict(best_model_wts)
     
-    return model,[train_acc_history,train_loss_history,val_acc_history,val_loss_history]
+    return model,[train_acc_history,train_loss_history,val_acc_history,val_loss_history], time_elapsed // 60
 
 
 

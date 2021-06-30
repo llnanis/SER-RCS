@@ -1,36 +1,13 @@
-# -*- coding: utf-8 -*-
+    # -*- coding: utf-8 -*-
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
 
-class Random_shift(object):
-    """class for transformation, using random_shift_torch function"""
-    #Random_shift transf
-    def __init__(self,n_shift):
-        self.n_shift = n_shift
-    
-    def __call__(self, img):
-        return random_shift_torch(img,self.n_shift)
-        
-    def __repr__(self):
-        return self.__class__.__name__ + '(n_shift = {})'.format(self.n_shift)
-    
+from audiomentations import Compose, AddGaussianNoise, TimeStretch, PitchShift, Shift, AddGaussianSNR
 
-class Gaussian_Noise(object) : 
-    
-    def __init__(self,mean,std):
-        self.mean = mean
-        self.std = std
-        
-    def __call__(self,img):
-        return img + torch.randn(size = img.size())*self.std + self.mean
-    
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean = {}, std = {})'.format(self.n_shift,self.std)
-    
-    
+
 def random_shift_np(image,n_shift,display = False):
     """
     random shift image n_shift times.
@@ -50,17 +27,19 @@ def random_shift_np(image,n_shift,display = False):
     shift : array of int (n_shift) contains value of the shift
         
     """
-    shift = np.random.randint(low=1,high = 226,size = n_shift)
-    shifted = np.empty(shape = (n_shift,227,227,3), dtype = image.dtype)
+    shift = np.random.randint(low=1,high = image.shape[0]-1,size = n_shift)
+    shifted = np.empty(shape = (n_shift,image.shape[0],image.shape[1],3), dtype = image.dtype)
     
     for i in range(n_shift):
-        shifted[i,:,shift[i]:,:] = image[:,0:227-shift[i],:]
-        shifted[i,:,0:shift[i],:] = image[:,227-shift[i]:,:]
+        shifted[i,:,shift[i]:,:] = image[:,0:image.shape[0]-shift[i],:]
+        shifted[i,:,0:shift[i],:] = image[:,image.shape[0]-shift[i]:,:]
         
         if display :
             plt.figure()
             plt.imshow(shifted[i])
             plt.title("shift of %s"%shift[i])
+            plt.xlabel("Time sample")
+            plt.ylabel("Frequency bin")
         
     return shifted, shift
 
@@ -89,7 +68,7 @@ def random_shift_torch(image,n_shift,display = False):
     return shifted
 
 
-def random_shift_data(xtrain,ytrain, n_shift = 1,save = False):
+def random_shift_data(xtrain,ytrain, n_shift,save = False):
     """
     random shift the train data xtrain and create corresponding labels.
 
@@ -107,15 +86,40 @@ def random_shift_data(xtrain,ytrain, n_shift = 1,save = False):
     
     THE SHIFTED DATA ARE APPENED AT THE END OF XTRAIN
     """
-    print("Random Shifting, {} shift per image".format(n_shift))
-    x_augm = np.empty(shape = (len(ytrain)*n_shift,227,227,3),dtype=xtrain.dtype)
-    y_augm = np.empty(shape = (len(ytrain)*n_shift),dtype=ytrain.dtype)
-
-    for i in range(len(ytrain)):
-         shift , _ = random_shift_np(image = xtrain[i],n_shift = n_shift)    
-         x_augm[i*n_shift:i*n_shift+n_shift,:,:,:] = shift
-         y_augm[i*n_shift:i*n_shift+n_shift] = ytrain[i]
         
+    print("Random Shifting, {} shift per image".format(n_shift))
+    if (n_shift <= 0) :
+        print("Number of Shift < 0, NO RCS APPLIED")
+        return xtrain,ytrain
+    ###################################################################################################
+    if (n_shift < 1) :
+        proba = np.random.uniform(low=0,high=1,size=len(ytrain))
+        indexs = np.where(proba<=n_shift)
+        
+        x_augm = []
+        y_augm = []
+        for i in range(len(indexs[0])):
+            j = indexs[0][i]
+            shift,_ = random_shift_np(image = xtrain[j],n_shift = 1 )
+            x_augm.append(shift[0])
+            y_augm.append(ytrain[j])
+        
+        x_augm = np.array(x_augm,dtype=xtrain.dtype)
+        y_augm = np.array(y_augm)
+    
+            
+    ##################################################################################################    
+    else : 
+        x_augm = np.empty(shape = (len(ytrain)*n_shift,xtrain.shape[1],xtrain.shape[2],3),dtype=xtrain.dtype)
+        y_augm = np.empty(shape = (len(ytrain)*n_shift),dtype=ytrain.dtype)
+    
+        for i in range(len(ytrain)):
+             shift , _ = random_shift_np(image = xtrain[i],n_shift = n_shift)    
+             x_augm[i*n_shift:i*n_shift+n_shift,:,:,:] = shift
+             y_augm[i*n_shift:i*n_shift+n_shift] = ytrain[i]
+            
+    ######################################################################################################
+    
     data = np.vstack((xtrain,x_augm))
     labels = np.append(ytrain,y_augm)
         
@@ -198,6 +202,11 @@ def snr_db(signal,noisy_signal):
             snrs.append(puissance(signal[i])/puissance(signal[i]-noisy_signal[i]))
         return snrs
 
+def linear(snr_db) :
+    return 10**(snr_db/10)
+
+def db(snr):
+    return 10*np.log10(snr)
 
 def add_noise(SNR_db,audio):
     """
@@ -261,3 +270,34 @@ def add_gaussian_noise_to_audios(audios,train_size,SNR_db,p=0.5):
 
     return noisy
 
+def audio_augmentation(xtrain,ytrain,Fs,p=0.5):
+    
+    proba = np.random.uniform(low=0,high=1,size=len(xtrain))
+
+    augment = Compose([
+        AddGaussianSNR(min_SNR=1/10, max_SNR=1/10, p=1),#20db
+        #TimeStretch(min_rate=0.8, max_rate=1.25, p=1),
+        #PitchShift(min_semitones=-4, max_semitones=4, p=1),
+        #Shift(min_fraction=-0.5, max_fraction=0.5, p=1),
+    ])
+    indexs = np.where(proba<=p)
+    xa = []
+    ya = []
+    print("DATA AUGMENTATION ON AUDIO, NUMBER OF AUGMENTED DATA %s"%len(indexs[0]))
+    
+    for i in range(len(indexs[0])):
+        
+        j = indexs[0][i]
+        
+        try : 
+            xa.append(  augment( samples = xtrain[j].copy(), sample_rate = Fs) )
+        except :
+            xa.append(  augment( samples = xtrain[j], sample_rate = Fs) )
+        
+        ya.append( ytrain[j])
+
+    # x = np.append(xtrain,np.array(xa,dtype = object),axis=0)
+    # y = np.append(ytrain,np.array(ya))
+    
+    return np.array(xa,dtype = object) , np.array(ya)
+        

@@ -9,7 +9,7 @@ from scipy.io import wavfile
 import os
 
 
-def generate_stft_image(audio_array,signal_len,Fs, n_fft,win_length, hop_length, toint=True):
+def generate_stft_image(audio_array,out_size,signal_len,Fs, n_fft,win_length, hop_length, toint=True):
     #pour enterface05 signal_len = 3, Fs=44100, n_fft = 1024-1, hop_length = 582
     #pour enterface05 signal_len = 3, Fs=16000, n_fft = 1024-1, hop_length = 221
     """
@@ -38,14 +38,15 @@ def generate_stft_image(audio_array,signal_len,Fs, n_fft,win_length, hop_length,
     array of size (227,227,3), containing (stft,delta,delta delta)
 
     """
-    nb_samples = int(signal_len * Fs)
     
+    nb_samples = int(signal_len * Fs)
     if len(audio_array) < nb_samples:
         audio_array = np.pad(audio_array, (0,nb_samples-len(audio_array)) , 'constant')
     #compute sftf of audio array
     stft = librosa.stft(y=audio_array,n_fft=n_fft, win_length = win_length, hop_length=hop_length)
+    print(stft.shape)
     #crop
-    filtered_stft = stft[0:227,0:227]   
+    filtered_stft = stft[0:out_size[0],0:out_size[1]]   
 
     #10*log(|stft|)
     #stft_db = librosa.power_to_db(filtered_stft, ref=np.max)
@@ -66,7 +67,7 @@ def generate_stft_image(audio_array,signal_len,Fs, n_fft,win_length, hop_length,
     return A
 
 
-def generate_stft_images(vector_audio_array,signal_len,Fs, n_fft,win_length, hop_length, save = False, toint = True):
+def generate_stft_images(vector_audio_array,out_size,signal_len,Fs, n_fft,win_length, hop_length, save = False, toint = True):
     """
     generate an array of images from an array of audio 
     call generate_image() for each audio in vector_audio_array
@@ -90,10 +91,10 @@ def generate_stft_images(vector_audio_array,signal_len,Fs, n_fft,win_length, hop
 
     """
     print("Generating STFT Images from audios")
-    print("\t signal_len %s, Fs %s, n_fft %s, hop_length %s, save %s, toint %s"%(signal_len,Fs,n_fft,hop_length,save,toint))
+    print("\t out_size %s, signal_len %s, Fs %s, n_fft %s, win_length %s,hop_length %s, save %s, toint %s"%(out_size,signal_len,Fs,n_fft,win_length,hop_length,save,toint))
     res = []
-    for i in range(vector_audio_array.shape[-1]):
-        res.append(generate_stft_image(vector_audio_array[i], signal_len = signal_len, 
+    for i in range(len(vector_audio_array)):
+        res.append(generate_stft_image(vector_audio_array[i],out_size,signal_len = signal_len, 
         Fs = Fs, n_fft = n_fft, win_length=win_length,hop_length= hop_length, toint = toint))
     
     
@@ -105,7 +106,7 @@ def generate_stft_images(vector_audio_array,signal_len,Fs, n_fft,win_length, hop
     return np.array(res)
 
 
-def generate_cqt_image(audio_array,signal_len,Fs,n_bins,bins_per_octave, toint = True):
+def generate_cqt_image(audio_array,out_size,signal_len,Fs,n_bins,bins_per_octave, toint = True):
     #pour enterface signal_len= 3, Fs = 44100, n_bins = 84*3,bins_per_octave = 12*3
     
     nb_samples = int(signal_len * Fs)
@@ -117,7 +118,7 @@ def generate_cqt_image(audio_array,signal_len,Fs,n_bins,bins_per_octave, toint =
     cqt = librosa.cqt(y=audio_array,n_bins=n_bins, bins_per_octave = bins_per_octave)
 
     #crop
-    filtered_cqt = cqt[0:227,0:227]   
+    filtered_cqt = cqt[0:out_size[0],0:out_size[1]]   
 
     #10*log(|stft|)
     #cqt_db = librosa.power_to_db(filtered_cqt, ref=np.max)
@@ -138,13 +139,13 @@ def generate_cqt_image(audio_array,signal_len,Fs,n_bins,bins_per_octave, toint =
     return A
 
 
-def generate_cqt_images(vector_audio_array,signal_len,Fs,n_bins,bins_per_octave, save = False,toint = True):
+def generate_cqt_images(vector_audio_array,out_size,signal_len,Fs,n_bins,bins_per_octave, save = False,toint = True):
     print("Generating CQT Images from audios")
     print("\t signal_len %s, Fs %s, n_bins %s, bins_per_octave %s, save %s, toint %s"%(signal_len,Fs,n_bins,bins_per_octave,save,toint))
     res = []
     for i in range(vector_audio_array.shape[-1]):
-        res.append(generate_cqt_image(vector_audio_array[i], signal_len = signal_len, Fs = Fs, n_bins = n_bins, bins_per_octave =bins_per_octave, toint = toint))
-    
+        res.append(generate_cqt_image(vector_audio_array[i], out_size,signal_len = signal_len, Fs = Fs, n_bins = n_bins, bins_per_octave =bins_per_octave, toint = toint))
+        print(i)
     if save : 
         file_name = "generated_%s_images_cqt_%s"%(toint,str(len(res)))
         np.save(arr = np.array(res),file = file_name)
@@ -280,7 +281,8 @@ def preprocess_emodb(save = False, data_path = "emodb_audio.npy", label_path = "
     data = np.array(data,dtype = object)
     label = np.array(label)
     subject_label = np.array(subject_label)
-    # print("SAMPLING RATE = %s Hz"%sr)
+    print("SAMPLING RATE = %s Hz"%sr)
+    
     # print("10 premiers :")
     # for i in range(10):
     #     print(audio_files[i],label[i],subject_label[i])

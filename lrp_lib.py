@@ -26,8 +26,9 @@ def heatmap(R,sx,sy):
     my_cmap = ListedColormap(my_cmap)
     plt.figure(figsize=(sx,sy))
     plt.subplots_adjust(left=0,right=1,bottom=0,top=1)
-    plt.axis('off')
-    plt.imshow(R,cmap=my_cmap,vmin=-b,vmax=b,interpolation='nearest')
+    plt.xlabel("Time sample")
+    plt.ylabel("Frequency bin")
+    plt.imshow(R*1.5,cmap=my_cmap,vmin=-b,vmax=b,interpolation='nearest',origin = "lower")
     plt.show()
 
 
@@ -75,7 +76,7 @@ def toconv(layers):
     return newlayers
 
 
-def lrp_alexnet(alexnet,image):
+def lrp_alexnet(alexnet,image,label,dic_emotions,display = False):
     
     print("LRP")
     layers = list(alexnet._modules['features']) + toconv(list(alexnet._modules['classifier']))
@@ -90,7 +91,7 @@ def lrp_alexnet(alexnet,image):
     scores = numpy.array(B[-1].data.view(-1))
     ind = numpy.argsort(-scores)
     
-    print("scores of each classes")
+    print("scores of each classes (prediction)")
     for i in ind[:n_classes]:
         print('%20s (%3d): %6.3f'%(dic_emotions[i],i,scores[i]))
         
@@ -120,32 +121,82 @@ def lrp_alexnet(alexnet,image):
         else:
         
             R[l] = R[l+1]
-            
-    return R
+    
+    if display == True:
+        
+        # plt.figure()
+        # plt.imshow(img[:,:,0],cmap=plt.cm.gray,origin = 'lower')
+        # plt.xlabel("Time sample")
+        # plt.ylabel("Frequency bin")
+        #heatmap(numpy.array(R[0][0]).sum(axis=0),3.5,3.5)
+        
+        
+
+        saliency = numpy.array(R[0][0]).sum(axis=0)
+        saliency = saliency/numpy.max(saliency)
+        b = 10*((numpy.abs(saliency)**3.0).mean()**(1.0/3))
+        from matplotlib.colors import ListedColormap
+        my_cmap = plt.cm.seismic(numpy.arange(plt.cm.seismic.N))
+        my_cmap[:,0:3] *= 0.85
+        my_cmap = ListedColormap(my_cmap)
+        extent = (0,img.shape[0],0,img.shape[1])
+        
+        plt.figure()
+        plt.xlabel("Time sample")
+        plt.ylabel("Frequency bin")
+        plt.title("Ground truth: %s, Predicted label: %s"%(label,dic_emotions[ind[0]]))
+        plt.imshow(img[::-1,:,0],cmap=plt.cm.gray,extent = extent,)
+        
+        plt.colorbar()
+        plt.imshow(saliency[::-1,:]*5,cmap = my_cmap,vmin=-b,vmax=b,
+                   interpolation='nearest',extent = extent,alpha = 0.3)
+        plt.colorbar()
+        plt.show()
+
+        
+    return R,ind
     
 
 if __name__ == '__main__':
 
     from fine_tune import create_alexnet
     
+
+    
+
+    """EMO-DB"""
+    #dic_emotions = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'boredom','neutral']
+    #model_path = "models/LOSO_3s_rcs5/LOSO_s03"
+    # images = numpy.load("emodb_3s_images.npy",allow_pickle = True)
+    # labels = numpy.load("emodb_labels.npy",allow_pickle = True)#
+    # subject_label = numpy.load("emodb_subject_label.npy",allow_pickle = True)
+    
+    """eNTERFACE05"""
     dic_emotions = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise']
+    model_path = "models/best_model_e5"
+    images = numpy.load("e5_int_stft_amp2db.npy", allow_pickle = True)
+    labels = numpy.load("enterface05_labels.npy",allow_pickle = True)
+
+
     n_classes = len(dic_emotions)
-      
-    model_path = "models/exp16"
     model = create_alexnet(n_classes,pretrained = True)
-    model.load_state_dict(torch. load(model_path))
+    model.load_state_dict(torch.load(model_path,map_location = torch.device('cpu')))
     #modelvgg = torchvision.models.vgg16(pretrained=True);
     model.eval()
     
-
-    images = numpy.load("e5_int_stft_amp2db.npy", allow_pickle = True)
-    labels = numpy.load("enterface05_labels.npy",allow_pickle = True)
-    i = 0
-    img = images[i]
-    lab = labels[i]
+    i = 1263
     
-    R = lrp_alexnet(model,img)
-    plt.figure()
-    plt.imshow(img[:,:,0])
-    plt.title("True label : %s"%lab)
-    heatmap(numpy.array(R[0][0]).sum(axis=0),3.5,3.5)
+    for j in range(10):
+        i += 3
+        img = images[i]
+        lab = labels[i]
+        #print("subject_lab %s"%subject_label[i])
+        R,ind = lrp_alexnet(model,img,lab,dic_emotions,display = True)
+    
+    
+    # plt.figure()
+    # plt.imshow(img[:,:,1])
+    # plt.xlabel("Time Sample")
+    # plt.ylabel("Frequency Sample")
+    # plt.title("Label: %s, Predicted label: %s"%(lab,dic_emotions[ind[0]]))
+    # heatmap(numpy.array(R[0][0]).sum(axis=0),3.5,3.5)
