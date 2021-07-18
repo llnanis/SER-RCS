@@ -45,7 +45,8 @@ def plot_cm(cm,dic_emotions):
     
     
     f, ax = plt.subplots(figsize = (7,7))
-    sns.heatmap(np.round(cm*100,decimals = 2), annot=True, fmt='g', ax=ax,cmap="YlGnBu");
+    #sns.heatmap(np.round(cm*100,decimals = 2), annot=True, fmt='g', ax=ax,cmap="YlGnBu");
+    sns.heatmap(cm, annot=True, fmt='g', ax=ax,cmap="YlGnBu");
     ax.xaxis.tick_top()
     ax.xaxis.set_ticklabels(dic_emotions); 
     ax.yaxis.set_ticklabels(dic_emotions);
@@ -394,11 +395,11 @@ class Losgo_e5(Training):
             val_acc[i] = h[2]
             
         #mean_cm = mean_cm/len(self.kfold)
-        """average accuracy"""
-        for i in range(len(self.dic_emotions)):
-            mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
+        # """average accuracy"""
+        # for i in range(len(self.dic_emotions)):
+        #     mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
         
-        """average recall"""
+        #"""average recall"""
         # for i in range(len(self.dic_emotions)):
         #      mean_cm[i,:]=mean_cm[i,:]/np.sum(mean_cm[i,:])
 
@@ -410,6 +411,7 @@ class Losgo_e5(Training):
 class Loso_edb(Training):
     
     def __init__(self,
+                 subject,
                  subject_label,
                  dic_emotions,
                  
@@ -436,7 +438,7 @@ class Loso_edb(Training):
                          rcs,noise,raw_data)
         
         self.subject_label = subject_label
-        self.subject = ['03', '08', '09', '10', '11', '12', '13', '14', '15', '16']
+        self.subject = subject
         
     def start(self,model_name, model_path, save_model = False,save_path= "" ):
 
@@ -459,7 +461,7 @@ class Loso_edb(Training):
     
     def eval(self,model_name,models_path):
         print("EVALUATING MODEL %s AND PLOTTING CONFUSION MATRIX"%models_path)
-        mean_cm = np.zeros((len(self.dic_emotions),len(self.dic_emotions)),dtype = np.float64)
+        mean_cm = np.zeros((len(self.dic_emotions),len(self.dic_emotions)),dtype = np.int32)
         
         val_acc = dict()
         for i,a in enumerate(self.subject): 
@@ -479,10 +481,10 @@ class Loso_edb(Training):
             
         #mean_cm = mean_cm/len(self.subject)
         """average accuracy"""
-        for i in range(len(self.dic_emotions)):
-            mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
+        # for i in range(len(self.dic_emotions)):
+        #     mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
         
-        """average recall"""
+        # """average recall"""
         # for i in range(len(self.dic_emotions)):
         #       mean_cm[i,:]=mean_cm[i,:]/np.sum(mean_cm[i,:])
 
