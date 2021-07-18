@@ -41,12 +41,14 @@ def plot_history(h):
     ax2.set_xlabel("Epochs")
     ax2.legend()
     
-def plot_cm(cm,dic_emotions):
+def plot_cm(cm,dic_emotions,normalized = False):
     
     
     f, ax = plt.subplots(figsize = (7,7))
-    #sns.heatmap(np.round(cm*100,decimals = 2), annot=True, fmt='g', ax=ax,cmap="YlGnBu");
-    sns.heatmap(cm, annot=True, fmt='g', ax=ax,cmap="YlGnBu");
+    if normalized == True :
+        sns.heatmap(np.round(cm*100,decimals = 2), annot=True, fmt='g', ax=ax,cmap="YlGnBu");
+    else :
+        sns.heatmap(cm, annot=True, fmt='g', ax=ax,cmap="YlGnBu");
     ax.xaxis.tick_top()
     ax.xaxis.set_ticklabels(dic_emotions); 
     ax.yaxis.set_ticklabels(dic_emotions);
@@ -394,12 +396,12 @@ class Losgo_e5(Training):
             h = np.load("%s_history.npy"%(m_path),allow_pickle = True)
             val_acc[i] = h[2]
             
-        #mean_cm = mean_cm/len(self.kfold)
-        # """average accuracy"""
+
+        #"""normalize along prediction""" 
         # for i in range(len(self.dic_emotions)):
         #     mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
         
-        #"""average recall"""
+        #"""normalize along ground truth"""
         # for i in range(len(self.dic_emotions)):
         #      mean_cm[i,:]=mean_cm[i,:]/np.sum(mean_cm[i,:])
 
@@ -461,7 +463,7 @@ class Loso_edb(Training):
     
     def eval(self,model_name,models_path):
         print("EVALUATING MODEL %s AND PLOTTING CONFUSION MATRIX"%models_path)
-        mean_cm = np.zeros((len(self.dic_emotions),len(self.dic_emotions)),dtype = np.int32)
+        mean_cm = np.zeros((len(self.dic_emotions),len(self.dic_emotions)),dtype = np.float64)
         
         val_acc = dict()
         for i,a in enumerate(self.subject): 
@@ -479,12 +481,12 @@ class Loso_edb(Training):
             h = np.load("%s_history.npy"%m_path,allow_pickle = True)
             val_acc[a] = h[2]
             
-        #mean_cm = mean_cm/len(self.subject)
-        """average accuracy"""
+
+        #"""normalize along prediction""" 
         # for i in range(len(self.dic_emotions)):
         #     mean_cm[:,i]=mean_cm[:,i]/np.sum(mean_cm[:,i])
         
-        # """average recall"""
+        #"""normalize along ground truth"""
         # for i in range(len(self.dic_emotions)):
         #       mean_cm[i,:]=mean_cm[i,:]/np.sum(mean_cm[i,:])
 
