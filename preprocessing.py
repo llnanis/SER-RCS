@@ -145,7 +145,6 @@ def generate_cqt_images(vector_audio_array,out_size,signal_len,Fs,n_bins,bins_pe
     res = []
     for i in range(vector_audio_array.shape[-1]):
         res.append(generate_cqt_image(vector_audio_array[i], out_size,signal_len = signal_len, Fs = Fs, n_bins = n_bins, bins_per_octave =bins_per_octave, toint = toint))
-        print(i)
     if save : 
         file_name = "generated_%s_images_cqt_%s"%(toint,str(len(res)))
         np.save(arr = np.array(res),file = file_name)
